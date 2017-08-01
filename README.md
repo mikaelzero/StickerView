@@ -4,6 +4,12 @@
 
 > 感谢好友 **Vincent** 提供的思路以及关键代码！
 
+
+
+### 效果
+
+![](https://github.com/miaoyongjun/Media/blob/master/sticker.gif?raw=true)
+
 ### 依赖
 
 ```
