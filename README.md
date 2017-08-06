@@ -12,8 +12,8 @@
 
 ### 依赖
 
-```
-allprojects {
+```java
+	allprojects {
 		repositories {
 			...
 			maven { url 'https://jitpack.io' }
@@ -27,8 +27,6 @@ allprojects {
 
 ### 使用
 
-
-
 ```java
 <miaoyongjun.stickerview.StickerView
         android:id="@+id/stickerView"
@@ -41,26 +39,36 @@ allprojects {
 ### 自定义属性
 
 ```java
-<!--初始图片大小缩放比例  默认为0.5f 相对于view的宽度-->
+<declare-styleable name="StickerView">
+        <!--初始图片大小缩放比例  默认为0.5f 相对于view的宽度 范围 0到1-->
         <attr name="m_image_init_scale" format="float"/>
         <!--贴纸的最大数量 默认为20个-->
         <attr name="m_max_count" format="integer"/>
-        <!--贴纸最小值的缩放比例  默认初始图片斜边的二分之一 根据宽度来定制-->
+        <!--贴纸最小值的缩放比例  默认初始图片斜边的二分之一 根据宽度来定制  范围 0到1-->
         <attr name="m_image_min_size_scale" format="float"/>
         <!--关闭按钮图标-->
         <attr name="m_close_icon" format="reference"/>
         <!--旋转按钮图标-->
         <attr name="m_rotate_icon" format="reference"/>
-        <!--关闭按钮图标大小 默认15dp-->
+        <!--关闭按钮图标大小 默认20dp-->
         <attr name="m_close_icon_size" format="dimension"/>
-        <!--旋转按钮图标大小 默认15dp-->
+        <!--旋转按钮图标大小 默认20dp-->
         <attr name="m_rotate_icon_size" format="dimension"/>
         <!--边框宽度 默认1dp-->
         <attr name="m_outline_width" format="dimension"/>
         <!--边框颜色 默认白色-->
         <attr name="m_outline_color" format="color"/>
+    </declare-styleable>
 ```
 
-###　后续计划
+### 后续计划
 
 - 文字水印和标签
+
+### 更改日志
+
+#### v1.1  
+
+- 增加双手触摸
+- 解决图片过大ANR
+- 添加点击排到最前的处理
