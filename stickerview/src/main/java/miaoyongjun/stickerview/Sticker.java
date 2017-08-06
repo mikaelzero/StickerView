@@ -3,7 +3,10 @@ package miaoyongjun.stickerview;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.Path;
-
+/**
+ * Author: miaoyongjun
+ * Date : 17/8/1
+ */
 
 public class Sticker {
 

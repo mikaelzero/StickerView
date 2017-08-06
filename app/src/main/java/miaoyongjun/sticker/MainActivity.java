@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
         cleanTv = (TextView) findViewById(R.id.cleanTv);
         nextTv = (TextView) findViewById(R.id.nextTv);
         stickerView = (StickerView) findViewById(R.id.stickerView);
-
+        stickerView.setMinStickerSizeScale(0.9f);
         LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this);
         linearLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         recyclerView.setLayoutManager(linearLayoutManager);
@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
         nextTv.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                BitmapUtil.FINAL_BITMAP = stickerView.getFinalStickerView();
+                BitmapUtil.FINAL_BITMAP = stickerView.saveSticker();
                 Intent intent = new Intent(MainActivity.this, PictureActivity.class);
                 startActivity(intent);
             }

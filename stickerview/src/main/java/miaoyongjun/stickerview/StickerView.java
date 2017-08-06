@@ -14,12 +14,18 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.support.annotation.DrawableRes;
+import android.support.annotation.Nullable;
+import android.support.v4.view.MotionEventCompat;
 import android.support.v7.widget.AppCompatImageView;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
 import java.util.ArrayList;
-
+import java.util.Collections;
+/**
+ * Author: miaoyongjun
+ * Date : 17/8/1
+ */
 
 public class StickerView extends AppCompatImageView {
 
@@ -174,12 +180,17 @@ public class StickerView extends AppCompatImageView {
     public boolean onTouchEvent(MotionEvent event) {
         float evX = event.getX(0);
         float evY = event.getY(0);
-
-        switch (event.getAction()) {
+        int action = MotionEventCompat.getActionMasked(event);
+        switch (action) {
             case MotionEvent.ACTION_POINTER_DOWN:
-                //然并卵的代码
-                evX = event.getX(event.getPointerCount() - 1);
-                evY = event.getY(event.getPointerCount() - 1);
+                midPoint = calculateMidPoint(event);
+                oldDistance = StickerUtil.calculateDistance(event);
+                oldRotation = StickerUtil.calculateRotation(event);
+                if (touchInsideSticker(event.getX(0), event.getY(0))
+                        && touchInsideSticker(event.getX(1), event.getY(1))) {
+                    state = TouchState.DOUBLE_TOUCH;
+                }
+                break;
             case MotionEvent.ACTION_DOWN:
                 if (touchInsideDeleteButton(evX, evY)) {
                     state = TouchState.PRESS_DELETE;
@@ -194,12 +205,16 @@ public class StickerView extends AppCompatImageView {
                 } else {
                     state = TouchState.TOUCHING_OUTSIDE;
                 }
+
                 break;
             case MotionEvent.ACTION_MOVE:
                 float dx = evX - lastPoint.x;
                 float dy = evY - lastPoint.y;
                 if (state == TouchState.PRESS_SCALE_AND_ROTATE) {
                     rotateAndScale(evX, evY);
+                }
+                if (state == TouchState.DOUBLE_TOUCH) {
+                    rotateAndScaleDoubleTouch(event);
                 }
                 if (state == TouchState.TOUCHING_INSIDE) {
                     translate(dx, dy);
@@ -221,10 +236,44 @@ public class StickerView extends AppCompatImageView {
                     invalidate();
                 }
                 break;
+            case MotionEvent.ACTION_POINTER_UP:
+                oldDistance = 0;
+                oldRotation = 0;
+                break;
         }
         lastPoint.x = evX;
         lastPoint.y = evY;
         return true;
+    }
+
+    private void rotateAndScaleDoubleTouch(MotionEvent event) {
+        if (event.getPointerCount() < 2) {
+            return;
+        }
+        //双手旋转时根据映射出的四个点坐标来判断最小值的临界点
+        float centerX = (currentSticker.getDst()[0] + currentSticker.getDst()[4]) / 2;
+        float centerY = (currentSticker.getDst()[1] + currentSticker.getDst()[5]) / 2;
+        float rightBottomX = currentSticker.getDst()[4];
+        float rightBottomY = currentSticker.getDst()[5];
+
+        float pathMeasureLength = getPathMeasureLength(centerX, centerY, rightBottomX, rightBottomY);
+        float newDistance = StickerUtil.calculateDistance(event);
+        float newRotation = StickerUtil.calculateRotation(event);
+        if (oldDistance != 0) {
+            Matrix matrix = currentSticker.getMatrix();
+            //可以放大  不能缩小
+            if ((newDistance - oldDistance) > 0) {
+                matrix.postScale(newDistance / oldDistance, newDistance / oldDistance, midPoint.x,
+                        midPoint.y);
+            } else if (pathMeasureLength > currentSticker.getMinStickerSize()) {
+                matrix.postScale(newDistance / oldDistance, newDistance / oldDistance, midPoint.x,
+                        midPoint.y);
+            }
+            matrix.postRotate(newRotation - oldRotation, midPoint.x, midPoint.y);
+            currentSticker.converse();
+        }
+        oldDistance = newDistance;
+        oldRotation = newRotation;
     }
 
     private void rotateAndScale(float evX, float evY) {
@@ -234,26 +283,51 @@ public class StickerView extends AppCompatImageView {
         float centerY = (currentSticker.getDst()[1] + currentSticker.getDst()[5]) / 2;
 
         //获取到触摸点到中心点距离 计算到中心点的距离比例得到X和Y的比例  通过相似三角形计算出最终结果
-        Path path = new Path();
-        path.moveTo(centerX, centerY);
-        path.lineTo(evX, evY);
-        PathMeasure pathMeasure = new PathMeasure(path, false);
-        if (pathMeasure.getLength() < currentSticker.getMinStickerSize()) {
-            evX = currentSticker.getMinStickerSize() * (evX - centerX) / pathMeasure.getLength() + centerX;
-            evY = currentSticker.getMinStickerSize() * (evY - centerY) / pathMeasure.getLength() + centerY;
+        float pathMeasureLength = getPathMeasureLength(centerX, centerY, evX, evY);
+        if (pathMeasureLength < currentSticker.getMinStickerSize()) {
+            evX = currentSticker.getMinStickerSize() * (evX - centerX) / pathMeasureLength + centerX;
+            evY = currentSticker.getMinStickerSize() * (evY - centerY) / pathMeasureLength + centerY;
         }
-
         dst[0] = centerX;
         dst[1] = centerY;
         dst[2] = evX;
         dst[3] = evY;
-
         Matrix matrix = currentSticker.getMatrix();
         matrix.reset();
         //并不是将图片从一组点变成另一组点  而是获取这两个组的点变换的matrix
         matrix.setPolyToPoly(src, 0, dst, 0, 2);
         currentSticker.converse();
     }
+
+    private float getPathMeasureLength(float moveX, float moveY, float lineX, float lineY) {
+        Path path = new Path();
+        path.moveTo(moveX, moveY);
+        path.lineTo(lineX, lineY);
+        PathMeasure pathMeasure = new PathMeasure(path, false);
+        return pathMeasure.getLength();
+    }
+
+    private float oldDistance = 0f;
+    private float oldRotation = 0f;
+    private PointF midPoint = new PointF();
+
+
+    protected PointF calculateMidPoint(@Nullable MotionEvent event) {
+        if (event == null || event.getPointerCount() < 2) {
+            midPoint.set(0, 0);
+            return midPoint;
+        }
+        try {
+            float x = (event.getX(0) + event.getX(1)) / 2;
+            float y = (event.getY(0) + event.getY(1)) / 2;
+            midPoint.set(x, y);
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+
+        return midPoint;
+    }
+
 
     private boolean touchInsideRotateButton(float evX, float evY) {
         return currentSticker != null && new RectF(currentSticker.getDst()[4] - btnRotateBitmap.getWidth() / 2, currentSticker.getDst()[5] - btnRotateBitmap.getHeight() / 2, currentSticker.getDst()[4] + btnRotateBitmap.getWidth() / 2, currentSticker.getDst()[5] + btnRotateBitmap.getHeight() / 2).contains(evX, evY);
@@ -278,6 +352,8 @@ public class StickerView extends AppCompatImageView {
             region.setPath(sticker.getBoundPath(), new Region(0, 0, getMeasuredWidth(), getMeasuredHeight()));
             if (region.contains((int) evX, (int) evY)) {
                 currentSticker = sticker;
+                int index = mStickers.indexOf(currentSticker);
+                Collections.swap(mStickers, index, mStickers.size() - 1);
                 return true;
             }
         }
@@ -285,7 +361,7 @@ public class StickerView extends AppCompatImageView {
     }
 
     private enum TouchState {
-        TOUCHING_INSIDE, TOUCHING_OUTSIDE, PRESS_DELETE, PRESS_SCALE_AND_ROTATE;
+        TOUCHING_INSIDE, TOUCHING_OUTSIDE, PRESS_DELETE, PRESS_SCALE_AND_ROTATE, DOUBLE_TOUCH;
     }
 
     public int getMaxStickerCount() {
@@ -365,7 +441,7 @@ public class StickerView extends AppCompatImageView {
         return (int) (dpValue * scale + 0.5f);
     }
 
-    public Bitmap getFinalStickerView() {
+    public Bitmap saveSticker() {
         currentSticker = null;
         Bitmap bitmap = Bitmap.createBitmap(getWidth(), getHeight(),
                 Bitmap.Config.ARGB_8888);
