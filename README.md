@@ -21,7 +21,7 @@
 	}
 	
 	dependencies {
-	        compile 'com.github.miaoyongjun:Sticker:1.0'
+	        compile 'com.github.miaoyongjun:Sticker:1.1'
 	}
 ```
 
