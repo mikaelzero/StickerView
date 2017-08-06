@@ -13,8 +13,10 @@ import android.graphics.PathMeasure;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.Region;
+import android.graphics.drawable.Drawable;
 import android.support.annotation.DrawableRes;
 import android.support.annotation.Nullable;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v7.widget.AppCompatImageView;
 import android.util.AttributeSet;
@@ -22,6 +24,7 @@ import android.view.MotionEvent;
 
 import java.util.ArrayList;
 import java.util.Collections;
+
 /**
  * Author: miaoyongjun
  * Date : 17/8/1
@@ -30,22 +33,15 @@ import java.util.Collections;
 public class StickerView extends AppCompatImageView {
 
     private ArrayList<Sticker> mStickers;
-
     private Paint mStickerPaint;
-
     private Bitmap btnDeleteBitmap;
-
     private Bitmap btnRotateBitmap;
-
     private Sticker currentSticker;
+    private PointF lastPoint;
+    private TouchState state;
 
     private int maxStickerCount;
     private float minStickerSizeScale;
-
-    private PointF lastPoint;
-
-    private TouchState state;
-
     private float imageBeginScale;
     private int closeIcon, rotateIcon;
     private int closeSize, rotateSize;
@@ -76,15 +72,14 @@ public class StickerView extends AppCompatImageView {
             minStickerSizeScale = typedArray.getFloat(R.styleable.StickerView_m_image_min_size_scale, 0.5f);
             closeIcon = typedArray.getResourceId(R.styleable.StickerView_m_close_icon, R.drawable.sticker_closed);
             rotateIcon = typedArray.getResourceId(R.styleable.StickerView_m_rotate_icon, R.drawable.sticker_rotate);
-            closeSize = typedArray.getDimensionPixelSize(R.styleable.StickerView_m_close_icon_size, dip2px(context, 15));
-            rotateSize = typedArray.getDimensionPixelSize(R.styleable.StickerView_m_rotate_icon_size, dip2px(context, 15));
+            closeSize = typedArray.getDimensionPixelSize(R.styleable.StickerView_m_close_icon_size, dip2px(context, 20));
+            rotateSize = typedArray.getDimensionPixelSize(R.styleable.StickerView_m_rotate_icon_size, dip2px(context, 20));
             outLineWidth = typedArray.getDimensionPixelSize(R.styleable.StickerView_m_outline_width, dip2px(context, 1));
             outLineColor = typedArray.getColor(R.styleable.StickerView_m_outline_color, Color.WHITE);
 
         } finally {
             typedArray.recycle();
         }
-
     }
 
     private void init(Context context) {
@@ -110,18 +105,20 @@ public class StickerView extends AppCompatImageView {
 
     }
 
-    public boolean addSticker(@DrawableRes int res) {
-        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), res);
-        return addSticker(bitmap);
-    }
 
-    public boolean addSticker(Bitmap stickerBitmap) {
+    public boolean addSticker(@DrawableRes int res) {
         if (mStickers.size() >= maxStickerCount) {
             return false;
         }
-        Sticker bean = new Sticker(stickerBitmap);
-        mStickers.add(bean);
-        currentSticker = bean;
+        Drawable drawable =
+                ContextCompat.getDrawable(getContext(), res);
+        return addSticker(drawable);
+    }
+
+    public boolean addSticker(Drawable drawable) {
+        DrawableSticker drawableSticker = new DrawableSticker(drawable);
+        mStickers.add(drawableSticker);
+        currentSticker = drawableSticker;
         invalidate();
         return true;
     }
@@ -150,16 +147,21 @@ public class StickerView extends AppCompatImageView {
                 float imageHeight = imageWidth / sticker.getBitmapScale();
                 float minSize = (float) Math.sqrt(imageWidth * imageWidth + imageHeight * imageHeight);
                 sticker.setMinStickerSize(minSize * minStickerSizeScale / 2);
-                sticker.getMatrix().postScale(imageWidth / sticker.getSrc().getWidth(), imageWidth / sticker.getSrc().getWidth());
+                sticker.getMatrix().postScale(imageWidth / sticker.getWidth(), imageWidth / sticker.getWidth());
                 sticker.getMatrix().postTranslate(
                         (getMeasuredWidth() - imageWidth) / 2,
                         (getMeasuredHeight() - imageHeight) / 2);
                 sticker.converse();
                 sticker.setInit(true);
             }
-            canvas.drawBitmap(sticker.getSrc(), sticker.getMatrix(), null);
+            sticker.draw(canvas);
             if (sticker == currentSticker) {
-                canvas.drawPath(sticker.getBoundPath(), mStickerPaint);
+                //不能使用 drawPath  否则图片过大时会导致 Path too large to be rendered into a texture
+                float[] dst = currentSticker.getDst();
+                canvas.drawLine(dst[0], dst[1], dst[2], dst[3], mStickerPaint);
+                canvas.drawLine(dst[2], dst[3], dst[4], dst[5], mStickerPaint);
+                canvas.drawLine(dst[4], dst[5], dst[6], dst[7], mStickerPaint);
+                canvas.drawLine(dst[6], dst[7], dst[0], dst[1], mStickerPaint);
                 drawBtn(sticker, canvas);
             }
         }
